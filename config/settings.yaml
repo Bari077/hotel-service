@@ -1,0 +1,18 @@
+# Application settings
+app:
+  name: "hotel-service"
+  host: "0.0.0.0"
+  port: 8000
+  debug: true
+
+# LLM settings
+llm:
+  model: "gigacode/gigacode-large"
+  temperature: 0.7
+  max_tokens: 1024
+
+# Cache settings
+cache:
+  backend: "redis"
+  ttl: 3600
+  redis_url: "redis://localhost:6379/0"
