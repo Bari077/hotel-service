@@ -11,6 +11,9 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["DEBUG"] = os.getenv("DEBUG", "true").lower() == "true"
 
+    from api.routes import api_bp
+    app.register_blueprint(api_bp)
+
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"})
