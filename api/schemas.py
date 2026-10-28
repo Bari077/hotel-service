@@ -26,5 +26,5 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     countryId: int
-    message: str
+    message: dict
     status: str

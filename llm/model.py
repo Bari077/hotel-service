@@ -7,7 +7,7 @@ import urllib3
 import requests
 from dotenv import load_dotenv
 
-from llm.prompts import build_prompt
+from llm.prompts import build_analyst_prompt, build_travel_expert_prompt
 
 # Load .env variables
 load_dotenv()
@@ -17,6 +17,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _TOKEN_CACHE: dict[str, dict] = {}
 _VERIFY_SSL = os.getenv("LLM_VERIFY_SSL", "false").lower() == "true"
+_REQUEST_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", 30))
+_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", 3))
 
 
 def get_access_token(authorization_key: str) -> str:
@@ -55,12 +57,8 @@ def get_access_token(authorization_key: str) -> str:
     return token
 
 
-def chat_completion(authorization_key: str, country_id: int, user_message: str) -> str:
-    """Send a prompt to GigaChat and return the assistant's reply."""
-    token = get_access_token(authorization_key)
-
-    system_prompt, user_prompt = build_prompt(country_id, user_message)
-
+def _make_request(token: str, system_prompt: str, user_prompt: str) -> str:
+    """Make a single HTTP request to GigaChat API."""
     url = "https://api.giga.chat/v1/chat/completions"
     headers = {
         "Accept": "application/json",
@@ -77,8 +75,58 @@ def chat_completion(authorization_key: str, country_id: int, user_message: str) 
         "temperature": float(os.getenv("LLM_TEMPERATURE", 0.7)),
     }
 
-    response = requests.post(url, headers=headers, json=payload, verify=_VERIFY_SSL)
+    response = requests.post(
+        url, headers=headers, json=payload,
+        timeout=_REQUEST_TIMEOUT, verify=_VERIFY_SSL,
+    )
     response.raise_for_status()
 
     data = response.json()
     return data["choices"][0]["message"]["content"]
+
+
+def chat_completion(
+    authorization_key: str,
+    country_id: int,
+    user_message: str,
+    system_prompt_override: str | None = None,
+    user_prompt_override: str | None = None,
+) -> str:
+    """Send a prompt to GigaChat with retry and timeout.
+
+    - Timeout: configurable via LLM_REQUEST_TIMEOUT (default 30s)
+    - Retry: up to LLM_MAX_RETRIES (default 3) with exponential backoff
+    - Raises RuntimeError on all failures (auth, timeout, 5xx, 4xx)
+    """
+    try:
+        token = get_access_token(authorization_key)
+    except requests.exceptions.RequestException:
+        raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+
+    if system_prompt_override and user_prompt_override:
+        system_prompt = system_prompt_override
+        user_prompt = user_prompt_override
+    else:
+        raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return _make_request(token, system_prompt, user_prompt)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt == _MAX_RETRIES:
+                raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+            wait = 2 ** (attempt - 1)
+            time.sleep(wait)
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 0
+            if status >= 500:
+                # Server error — retry
+                if attempt == _MAX_RETRIES:
+                    raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+                wait = 2 ** (attempt - 1)
+                time.sleep(wait)
+            else:
+                # Client error (4xx) — no retry
+                raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+
+    raise RuntimeError("Сервис временно недоступен, попробуйте позже")
