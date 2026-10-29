@@ -1,17 +1,13 @@
 """Entry point for hotel-service."""
 
 import os
-import logging
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-load_dotenv()
+from utils.logging import setup_logger, log_timing
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger(__name__)
+load_dotenv()
+logger = setup_logger()
 
 
 def create_app() -> Flask:

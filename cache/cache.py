@@ -8,7 +8,7 @@ from typing import Any
 
 import redis
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("hotel-service")
 
 _redis_client: redis.Redis | None = None
 
@@ -45,5 +45,5 @@ def cache_set(key_parts: tuple[str, ...], value: str, ttl: int | None = None) ->
     key = _make_key(*key_parts)
     r = _get_redis()
     ttl = ttl or int(os.getenv("CACHE_TTL", 600))  # default 10 min
-    r.setex(key, ttl, value)
+    r.set(key, value, ex=ttl)
     logger.info("CACHE SET  key=%s ttl=%ds", key[:40], ttl)
