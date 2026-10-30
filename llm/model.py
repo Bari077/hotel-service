@@ -1,5 +1,6 @@
 """LLM model client and inference logic."""
 
+import json
 import os
 import time
 import uuid
@@ -7,6 +8,7 @@ import urllib3
 import logging
 import requests
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from llm.prompts import build_travel_expert_prompt
 
@@ -60,16 +62,26 @@ def get_access_token(authorization_key: str) -> str:
     return token
 
 
-def _make_request(token: str, system_prompt: str, user_prompt: str) -> str:
-    """Make a single HTTP request to GigaChat API."""
+def _make_request(
+    token: str,
+    system_prompt: str,
+    user_prompt: str,
+    response_model: type[BaseModel] | None = None,
+) -> str | BaseModel:
+    """Make a single HTTP request to GigaChat API.
+
+    If response_model is provided, uses Structured Output with json_schema.
+    Otherwise returns raw text content.
+    """
     url = "https://api.giga.chat/v1/chat/completions"
     headers = {
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
+
     payload = {
-        "model": os.getenv("LLM_MODEL", "GigaChat-3-Lightning"),
+        "model": os.getenv("LLM_MODEL", "GigaChat-2"),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -78,12 +90,29 @@ def _make_request(token: str, system_prompt: str, user_prompt: str) -> str:
         "temperature": float(os.getenv("LLM_TEMPERATURE", 0.7)),
     }
 
+    # Add Structured Output if model is provided
+    if response_model is not None:
+        payload["response_format"] = {
+            "type": "json_schema",
+            "schema": response_model.model_json_schema(),
+            "strict": True,
+        }
+        logger.info(
+            "llm_request system_prompt_len=%d user_prompt_len=%d model=%s structured=%s",
+            len(system_prompt),
+            len(user_prompt),
+            os.getenv("LLM_MODEL", "GigaChat-2"),
+            response_model.__name__,
+        )
+    else:
+        logger.info(
+            "llm_request system_prompt_len=%d user_prompt_len=%d model=%s",
+            len(system_prompt),
+            len(user_prompt),
+            os.getenv("LLM_MODEL", "GigaChat-2"),
+        )
+
     start = time.time()
-    logger.info(
-        "llm_request system_prompt_len=%d user_prompt_len=%d model=%s",
-        len(system_prompt), len(user_prompt),
-        os.getenv("LLM_MODEL", "GigaChat-3-Lightning"),
-    )
     response = requests.post(
         url, headers=headers, json=payload,
         timeout=_REQUEST_TIMEOUT, verify=_VERIFY_SSL,
@@ -93,7 +122,24 @@ def _make_request(token: str, system_prompt: str, user_prompt: str) -> str:
 
     data = response.json()
     logger.info("llm_response duration_ms=%d", duration_ms)
-    return data["choices"][0]["message"]["content"]
+
+    content = data["choices"][0]["message"]["content"]
+
+    # If response_model is provided, parse the JSON string into the model
+    if response_model is not None:
+        try:
+            parsed = response_model.model_validate_json(content)
+            return parsed
+        except Exception as e:
+            logger.error(
+                "structured_parse_failed model=%s error=%s content=%s",
+                response_model.__name__,
+                e,
+                content[:200],
+            )
+            raise
+
+    return content
 
 
 def chat_completion(
@@ -102,11 +148,13 @@ def chat_completion(
     user_message: str,
     system_prompt_override: str | None = None,
     user_prompt_override: str | None = None,
-) -> str:
+    response_model: type[BaseModel] | None = None,
+) -> str | BaseModel:
     """Send a prompt to GigaChat with retry and timeout.
 
     - Timeout: configurable via LLM_REQUEST_TIMEOUT (default 30s)
     - Retry: up to LLM_MAX_RETRIES (default 3) with exponential backoff
+    - response_model: optional Pydantic model for Structured Output
     - Raises RuntimeError on all failures (auth, timeout, 5xx, 4xx)
     """
     try:
@@ -121,11 +169,18 @@ def chat_completion(
     else:
         raise RuntimeError("Сервис временно недоступен, попробуйте позже")
 
-    logger.info("llm_prompt system=%s user=%s", system_prompt[:500], user_prompt[:500])
+    logger.info(
+        "llm_prompt system=%s user=%s model=%s",
+        system_prompt[:500],
+        user_prompt[:500],
+        response_model.__name__ if response_model else "text",
+    )
 
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
-            return _make_request(token, system_prompt, user_prompt)
+            return _make_request(
+                token, system_prompt, user_prompt, response_model
+            )
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             logger.warning("llm_timeout attempt=%d/%d", attempt, _MAX_RETRIES)
             if attempt == _MAX_RETRIES:
@@ -135,7 +190,12 @@ def chat_completion(
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response is not None else 0
             if status >= 500:
-                logger.warning("llm_5xx status=%d attempt=%d/%d", status, attempt, _MAX_RETRIES)
+                logger.warning(
+                    "llm_5xx status=%d attempt=%d/%d",
+                    status,
+                    attempt,
+                    _MAX_RETRIES,
+                )
                 if attempt == _MAX_RETRIES:
                     raise RuntimeError("Сервис временно недоступен, попробуйте позже")
                 wait = 2 ** (attempt - 1)

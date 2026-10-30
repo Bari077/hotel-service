@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Service</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .container { max-width: 700px; margin: 40px auto; padding: 0 16px; }
+        h1 { text-align: center; margin-bottom: 24px; font-size: 24px; }
+        .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        label { display: block; font-weight: 600; margin-bottom: 6px; }
+        select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #d0d5dd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; font-family: inherit; }
+        textarea { min-height: 100px; resize: vertical; }
+        button { width: 100%; padding: 12px; background: #1d4ed8; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        button:hover { background: #1e40af; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        #response { margin-top: 20px; display: none; }
+        #response.error { display: block; padding: 16px; border-radius: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .loading { text-align: center; color: #64748b; display: none; margin-top: 16px; }
+
+        /* Response styles */
+        .response-message { padding: 12px 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; margin-bottom: 20px; color: #92400e; font-size: 14px; }
+        .response-title { font-size: 20px; font-weight: 700; margin-bottom: 16px; color: #1e293b; }
+        .region-block { margin-bottom: 24px; }
+        .region-name { font-size: 17px; font-weight: 600; color: #334155; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+        .hotel-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+        .hotel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .hotel-name { font-size: 15px; font-weight: 600; color: #0f172a; }
+        .hotel-category { background: #1d4ed8; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .hotel-field { margin-bottom: 8px; }
+        .hotel-field-label { font-weight: 600; color: #475569; font-size: 13px; margin-bottom: 2px; }
+        .hotel-field-value { font-size: 14px; color: #334155; line-height: 1.5; }
+        .recommendation { margin-top: 20px; padding: 14px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; font-size: 14px; }
+        .recommendation-label { font-weight: 600; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hotel Service</h1>
+        <div class="card">
+            <form id="chatForm">
+                <label for="countryId">Страна</label>
+                <select id="countryId" name="countryId" required>
+                    <option value="1">Турция</option>
+                    <option value="2">Египет</option>
+                    <option value="3">ОАЭ</option>
+                    <option value="4">Тайланд</option>
+                    <option value="5">Вьетнам</option>
+                    <option value="6">Китай</option>
+                    <option value="7">Мальдивы</option>
+                    <option value="8">Шри-Ланка</option>
+                </select>
+
+                <label for="message">Сообщение</label>
+                <textarea id="message" name="message" placeholder="Подскажи отели у моря..." required></textarea>
+
+                <button type="submit" id="submitBtn">Отправить</button>
+            </form>
+
+            <div class="loading" id="loading">Отправляю запрос...</div>
+            <div id="response"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('chatForm');
+        const responseDiv = document.getElementById('response');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+
+        function renderResponse(data) {
+            let html = '';
+
+            // Extract hotel data from response
+            const hotelData = (typeof data.message === 'object' && data.message !== null) ? data.message : {};
+
+            // Message at the top (if present as string)
+            if (hotelData.message && typeof hotelData.message === 'string') {
+                html += `<div class="response-message">${escapeHtml(hotelData.message)}</div>`;
+            }
+
+            // Hotel list
+            if (hotelData.hotelList && Array.isArray(hotelData.hotelList)) {
+                html += `<h2 class="response-title">Подборка отелей</h2>`;
+
+                hotelData.hotelList.forEach(region => {
+                    html += `<div class="region-block">`;
+                    html += `<h3 class="region-name">${escapeHtml(region.region)}</h3>`;
+
+                    if (region.hotels && Array.isArray(region.hotels)) {
+                        region.hotels.forEach(hotel => {
+                            html += `<div class="hotel-card">`;
+                            html += `<div class="hotel-header">`;
+                            html += `<span class="hotel-name">${escapeHtml(hotel.hotel)}</span>`;
+                            if (hotel.category) {
+                                const stars = '★'.repeat(hotel.category) + '☆'.repeat(5 - hotel.category);
+                                html += `<span class="hotel-category">${stars}</span>`;
+                            }
+                            html += `</div>`;
+
+                            if (hotel.description) {
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Описание</div><div class="hotel-field-value">${escapeHtml(hotel.description)}</div></div>`;
+                            }
+                            if (hotel.advantages) {
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Преимущества</div><div class="hotel-field-value">${escapeHtml(hotel.advantages)}</div></div>`;
+                            }
+                            if (hotel.nuance) {
+                                html += `<div class="hotel-field"><div class="hotel-field-label">На что обратить внимание</div><div class="hotel-field-value">${escapeHtml(hotel.nuance)}</div></div>`;
+                            }
+                            if (hotel.kindOfLeisure) {
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Для какого отдыха подойдет</div><div class="hotel-field-value">${escapeHtml(hotel.kindOfLeisure)}</div></div>`;
+                            }
+
+                            html += `</div>`;
+                        });
+                    }
+                    html += `</div>`;
+                });
+            }
+
+            // Travel recommendation
+            if (hotelData.travelRecommendation) {
+                html += `<div class="recommendation"><div class="recommendation-label">Рекомендация по сезону</div>${escapeHtml(hotelData.travelRecommendation)}</div>`;
+            }
+
+            responseDiv.innerHTML = html;
+            responseDiv.style.display = 'block';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            responseDiv.style.display = 'none';
+            responseDiv.className = '';
+            responseDiv.innerHTML = '';
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+
+            const data = {
+                countryId: parseInt(document.getElementById('countryId').value),
+                message: document.getElementById('message').value
+            };
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const json = await res.json();
+
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+
+                if (res.ok) {
+                    renderResponse(json);
+                } else {
+                    responseDiv.className = 'error';
+                    const errorMsg = json.message && json.message.error ? json.message.error : (json.error || 'Ошибка сервера');
+                    responseDiv.textContent = errorMsg;
+                }
+            } catch (err) {
+                loading.style.display = 'none';
+                responseDiv.className = 'error';
+                responseDiv.textContent = 'Не удалось connect к серверу';
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

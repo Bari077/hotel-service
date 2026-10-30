@@ -1,11 +1,10 @@
 """Unit tests for business logic."""
 
-import json
-
 import pytest
 
 from services.countries import get_country_name, COUNTRY_MAP
-from services.service import process_chat, _parse_analyst_response, is_empty_criteria
+from services.service import process_chat, is_empty_criteria
+from llm.schemas import AnalystResponse
 
 
 class TestCountries:
@@ -40,84 +39,58 @@ class TestProcessChat:
             process_chat(99, "test")
 
 
-class TestParseAnalystResponse:
-    """Tests for JSON parsing of LLM responses."""
-
-    def test_parse_valid_json(self):
-        """Valid JSON is parsed into dict."""
-        raw = '{"country": "Турция", "region": "Анталья"}'
-        result = _parse_analyst_response(raw)
-        assert isinstance(result, dict)
-        assert result["country"] == "Турция"
-
-    def test_parse_json_with_markdown_fences(self):
-        """JSON inside markdown code blocks is extracted correctly."""
-        raw = "```json\n{\"key\": \"value\"}\n```"
-        result = _parse_analyst_response(raw)
-        assert result["key"] == "value"
-
-    def test_parse_invalid_json(self):
-        """Invalid JSON raises JSONDecodeError."""
-        with pytest.raises(json.JSONDecodeError):
-            _parse_analyst_response("not a valid json")
-
-
 class TestIsEmptyCriteria:
     """Tests for is_empty_criteria function."""
 
     def test_all_empty(self):
         """All criteria empty → True."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": [],
-            "category": [],
-            "preferences": [],
-        }) is True
-
-    def test_null_values(self):
-        """All criteria null → True."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": None,
-            "category": None,
-            "preferences": None,
-        }) is True
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=[],
+            category=[],
+            preferences=[],
+        )
+        assert is_empty_criteria(analyst) is True
 
     def test_region_present(self):
         """Region specified → False."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": ["Пхукет"],
-            "category": [],
-            "preferences": [],
-        }) is False
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=["Пхукет"],
+            category=[],
+            preferences=[],
+        )
+        assert is_empty_criteria(analyst) is False
 
     def test_category_present(self):
         """Category specified → False."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": [],
-            "category": ["5"],
-            "preferences": [],
-        }) is False
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=[],
+            category=[5],
+            preferences=[],
+        )
+        assert is_empty_criteria(analyst) is False
 
     def test_preferences_present(self):
         """Preferences specified → False."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": [],
-            "category": [],
-            "preferences": ["у моря"],
-        }) is False
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=[],
+            category=[],
+            preferences=["у моря"],
+        )
+        assert is_empty_criteria(analyst) is False
 
     def test_all_present(self):
         """All criteria specified → False."""
-        assert is_empty_criteria({
-            "country": "Тайланд",
-            "region": ["Пхукет"],
-            "category": ["5"],
-            "preferences": ["все включено"],
-        }) is False
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=["Пхукет"],
+            category=[5],
+            preferences=["все включено"],
+        )
+        assert is_empty_criteria(analyst) is False
 
 
 class TestProcessChatMessage:
@@ -129,12 +102,13 @@ class TestProcessChatMessage:
             "hotelList": [{"region": "Пхукет", "hotels": []}],
             "travelRecommendation": "test",
         }
-        if is_empty_criteria({
-            "country": "Тайланд",
-            "region": [],
-            "category": [],
-            "preferences": [],
-        }):
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=[],
+            category=[],
+            preferences=[],
+        )
+        if is_empty_criteria(analyst):
             result["message"] = (
                 "Вы не задали ни одного критерия для подборки отелей. "
                 "Вот на всякий случай несколько отелей по запрошенной вами стране."
@@ -149,12 +123,13 @@ class TestProcessChatMessage:
             "hotelList": [{"region": "Пхукет", "hotels": []}],
             "travelRecommendation": "test",
         }
-        if is_empty_criteria({
-            "country": "Тайланд",
-            "region": ["Пхукет"],
-            "category": [],
-            "preferences": [],
-        }):
+        analyst = AnalystResponse(
+            country="Тайланд",
+            region=["Пхукет"],
+            category=[],
+            preferences=[],
+        )
+        if is_empty_criteria(analyst):
             result["message"] = "test"
 
         assert "message" not in result

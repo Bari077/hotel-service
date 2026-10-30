@@ -28,6 +28,15 @@ def _make_key(*parts: str) -> str:
     return f"hotel:cache:{hashlib.sha256(raw.encode()).hexdigest()[:32]}"
 
 
+def _is_valid_json(value: str) -> bool:
+    """Check if value is valid JSON."""
+    try:
+        json.loads(value)
+        return True
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+
 def cache_get(key_parts: tuple[str, ...]) -> str | None:
     """Get cached value. Logs HIT/MISS."""
     key = _make_key(*key_parts)
@@ -40,10 +49,24 @@ def cache_get(key_parts: tuple[str, ...]) -> str | None:
     return None
 
 
-def cache_set(key_parts: tuple[str, ...], value: str, ttl: int | None = None) -> None:
-    """Store value with TTL. Logs the set."""
+def cache_set(key_parts: tuple[str, ...], value: str, ttl: int | None = None) -> bool:
+    """Store value with TTL. Returns True if saved, False if invalid JSON."""
+    # Validate JSON before caching
+    if not _is_valid_json(value):
+        logger.warning("CACHE SKIP  invalid JSON key=%s", _make_key(*key_parts)[:40])
+        return False
+
     key = _make_key(*key_parts)
     r = _get_redis()
     ttl = ttl or int(os.getenv("CACHE_TTL", 600))  # default 10 min
     r.set(key, value, ex=ttl)
     logger.info("CACHE SET  key=%s ttl=%ds", key[:40], ttl)
+    return True
+
+
+def cache_delete(key_parts: tuple[str, ...]) -> None:
+    """Delete a key from cache."""
+    key = _make_key(*key_parts)
+    r = _get_redis()
+    r.delete(key)
+    logger.info("CACHE DEL  key=%s", key[:40])
