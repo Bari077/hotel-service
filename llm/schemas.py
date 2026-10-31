@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class AnalystResponse(BaseModel):
     """Response from the Analyst step — parses user request into structured criteria."""
 
-    country: str = Field(description="Название страны")
+    country: str = Field(description="Название страны из запроса пользователя")
     region: List[str] = Field(
         default_factory=list,
         description="Список курортов/регионов из запроса пользователя. Если нет — пустой массив",

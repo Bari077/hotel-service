@@ -1,30 +1,27 @@
-"""Schemas and request/response models."""
+"""API request/response schemas."""
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
-    countryId: int
-    message: str
+    """User chat request."""
 
-    @field_validator("countryId")
-    @classmethod
-    def country_id_positive(cls, v: int) -> int:
-        if v <= 0:
-            raise ValueError("countryId must be a positive integer")
-        return v
+    message: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Текст запроса пользователя",
+    )
 
     @field_validator("message")
     @classmethod
-    def message_not_empty_and_not_too_long(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("message must not be empty")
-        if len(v) > 1000:
-            raise ValueError("message must not exceed 1000 characters")
+    def message_not_whitespace(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Сообщение не может состоять только из пробелов")
         return v
 
 
 class ChatResponse(BaseModel):
-    countryId: int
+    """API response."""
+
     message: dict
-    status: str
+    status: str = "ok"

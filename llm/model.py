@@ -81,7 +81,7 @@ def _make_request(
     }
 
     payload = {
-        "model": os.getenv("LLM_MODEL", "GigaChat-2"),
+        "model": os.getenv("LLM_MODEL", "GigaChat-2-Pro"),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -101,7 +101,7 @@ def _make_request(
             "llm_request system_prompt_len=%d user_prompt_len=%d model=%s structured=%s",
             len(system_prompt),
             len(user_prompt),
-            os.getenv("LLM_MODEL", "GigaChat-2"),
+            os.getenv("LLM_MODEL", "GigaChat-2-Pro"),
             response_model.__name__,
         )
     else:
@@ -109,7 +109,7 @@ def _make_request(
             "llm_request system_prompt_len=%d user_prompt_len=%d model=%s",
             len(system_prompt),
             len(user_prompt),
-            os.getenv("LLM_MODEL", "GigaChat-2"),
+            os.getenv("LLM_MODEL", "GigaChat-2-Pro"),
         )
 
     start = time.time()
@@ -155,24 +155,28 @@ def chat_completion(
     - Timeout: configurable via LLM_REQUEST_TIMEOUT (default 30s)
     - Retry: up to LLM_MAX_RETRIES (default 3) with exponential backoff
     - response_model: optional Pydantic model for Structured Output
-    - Raises RuntimeError on all failures (auth, timeout, 5xx, 4xx)
+    - Raises LLMTimeoutError on timeout
+    - Raises LLMUnavailableError on auth/5xx failures
+    - Raises RuntimeError on other failures
     """
     try:
         token = get_access_token(authorization_key)
     except requests.exceptions.RequestException:
         logger.error("auth_failed authorization_key=%s", authorization_key[:20])
-        raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+        from services.service import LLMUnavailableError
+        raise LLMUnavailableError("Сервис временно недоступен, попробуйте позже")
 
     if system_prompt_override:
         system_prompt = system_prompt_override
         user_prompt = user_prompt_override or ""
     else:
-        raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+        from services.service import LLMUnavailableError
+        raise LLMUnavailableError("Сервис временно недоступен, попробуйте позже")
 
     logger.info(
         "llm_prompt system=%s user=%s model=%s",
-        system_prompt[:500],
-        user_prompt[:500],
+        system_prompt,
+        user_prompt,
         response_model.__name__ if response_model else "text",
     )
 
@@ -184,7 +188,8 @@ def chat_completion(
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             logger.warning("llm_timeout attempt=%d/%d", attempt, _MAX_RETRIES)
             if attempt == _MAX_RETRIES:
-                raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+                from services.service import LLMTimeoutError
+                raise LLMTimeoutError("Модель LLM пока недоступна, попробуйте позже")
             wait = 2 ** (attempt - 1)
             time.sleep(wait)
         except requests.exceptions.HTTPError as e:
@@ -197,11 +202,14 @@ def chat_completion(
                     _MAX_RETRIES,
                 )
                 if attempt == _MAX_RETRIES:
-                    raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+                    from services.service import LLMUnavailableError
+                    raise LLMUnavailableError("Модель LLM пока недоступна, попробуйте позже")
                 wait = 2 ** (attempt - 1)
                 time.sleep(wait)
             else:
                 logger.error("llm_4xx status=%d", status)
-                raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+                from services.service import LLMUnavailableError
+                raise LLMUnavailableError("Модель LLM пока недоступна, попробуйте позже")
 
-    raise RuntimeError("Сервис временно недоступен, попробуйте позже")
+    from services.service import LLMUnavailableError
+    raise LLMUnavailableError("Модель LLM пока недоступна, попробуйте позже")

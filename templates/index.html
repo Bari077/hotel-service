@@ -11,8 +11,7 @@
         h1 { text-align: center; margin-bottom: 24px; font-size: 24px; }
         .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
         label { display: block; font-weight: 600; margin-bottom: 6px; }
-        select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #d0d5dd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; font-family: inherit; }
-        textarea { min-height: 100px; resize: vertical; }
+        textarea { width: 100%; padding: 10px 12px; border: 1px solid #d0d5dd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; font-family: inherit; min-height: 100px; resize: vertical; }
         button { width: 100%; padding: 12px; background: #1d4ed8; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
         button:hover { background: #1e40af; }
         button:disabled { background: #94a3b8; cursor: not-allowed; }
@@ -41,20 +40,8 @@
         <h1>Hotel Service</h1>
         <div class="card">
             <form id="chatForm">
-                <label for="countryId">Страна</label>
-                <select id="countryId" name="countryId" required>
-                    <option value="1">Турция</option>
-                    <option value="2">Египет</option>
-                    <option value="3">ОАЭ</option>
-                    <option value="4">Тайланд</option>
-                    <option value="5">Вьетнам</option>
-                    <option value="6">Китай</option>
-                    <option value="7">Мальдивы</option>
-                    <option value="8">Шри-Ланка</option>
-                </select>
-
-                <label for="message">Сообщение</label>
-                <textarea id="message" name="message" placeholder="Подскажи отели у моря..." required></textarea>
+                <label for="message">Запрос</label>
+                <textarea id="message" name="message" placeholder="Подскажи отели у моря в Турции..." required></textarea>
 
                 <button type="submit" id="submitBtn">Отправить</button>
             </form>
@@ -95,7 +82,8 @@
                             html += `<div class="hotel-header">`;
                             html += `<span class="hotel-name">${escapeHtml(hotel.hotel)}</span>`;
                             if (hotel.category) {
-                                const stars = '★'.repeat(hotel.category) + '☆'.repeat(5 - hotel.category);
+                                const starsCount = Math.min(Math.max(hotel.category, 1), 5);
+                                const stars = '★'.repeat(starsCount) + '☆'.repeat(5 - starsCount);
                                 html += `<span class="hotel-category">${stars}</span>`;
                             }
                             html += `</div>`;
@@ -144,7 +132,6 @@
             submitBtn.disabled = true;
 
             const data = {
-                countryId: parseInt(document.getElementById('countryId').value),
                 message: document.getElementById('message').value
             };
 
@@ -163,8 +150,10 @@
                     renderResponse(json);
                 } else {
                     responseDiv.className = 'error';
-                    const errorMsg = json.message && json.message.error ? json.message.error : (json.error || 'Ошибка сервера');
-                    responseDiv.textContent = errorMsg;
+                    // Extract error message from nested structure
+                    const msg = json.message && json.message.error ? json.message.error : (json.error || 'Ошибка сервера');
+                    responseDiv.textContent = msg;
+                    responseDiv.style.whiteSpace = 'pre-wrap';
                 }
             } catch (err) {
                 loading.style.display = 'none';

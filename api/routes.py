@@ -4,9 +4,8 @@ import time
 
 from flask import Blueprint, request, jsonify
 
-from api.schemas import ChatRequest, ChatResponse
-from services.service import process_chat
-from utils.logging import log_timing
+from api.schemas import ChatRequest
+from services.service import process_chat, LLMUnavailableError, LLMValidationError, LLMTimeoutError
 
 import logging
 logger = logging.getLogger("hotel-service")
@@ -16,7 +15,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 @api_bp.route("/chat", methods=["POST"])
 def chat():
-    """Accept countryId + message, forward to GigaChat, return parsed JSON."""
+    """Accept user message, forward to GigaChat, return parsed JSON."""
     start = time.time()
     ip = request.remote_addr
 
@@ -35,11 +34,17 @@ def chat():
         return jsonify({"error": str(e)}), 422
 
     try:
-        result = process_chat(data.countryId, data.message)
+        result = process_chat(data.message)
         status = 200
-    except ValueError as e:
+    except LLMTimeoutError as e:
         result = {"error": str(e)}
-        status = 400
+        status = 503
+    except LLMValidationError as e:
+        result = {"error": str(e)}
+        status = 500
+    except LLMUnavailableError as e:
+        result = {"error": str(e)}
+        status = 503
     except RuntimeError as e:
         result = {"error": str(e)}
         status = 503
@@ -49,7 +54,7 @@ def chat():
 
     duration_ms = round((time.time() - start) * 1000)
     logger.info(
-        "request_complete ip=%s countryId=%d status=%d duration_ms=%d",
-        ip, data.countryId, status, duration_ms,
+        "request_complete ip=%s status=%d duration_ms=%d",
+        ip, status, duration_ms,
     )
-    return jsonify({"countryId": data.countryId, "message": result, "status": "ok"}), status
+    return jsonify({"message": result, "status": "ok"}), status

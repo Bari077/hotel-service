@@ -2,25 +2,8 @@
 
 import pytest
 
-from services.countries import get_country_name, COUNTRY_MAP
 from services.service import process_chat, is_empty_criteria
 from llm.schemas import AnalystResponse
-
-
-class TestCountries:
-    """Tests for country mapping."""
-
-    def test_get_country_name_valid(self):
-        """Mapping exists for all expected countries."""
-        assert get_country_name(1) == "Турция"
-        assert get_country_name(8) == "Шри-Ланка"
-        assert len(COUNTRY_MAP) == 8
-
-    def test_get_country_name_invalid(self):
-        """Mapping returns None for unknown country ID."""
-        assert get_country_name(99) is None
-        assert get_country_name(0) is None
-        assert get_country_name(-1) is None
 
 
 class TestProcessChat:
@@ -30,13 +13,7 @@ class TestProcessChat:
         """Missing LLM_AUTH_KEY raises RuntimeError."""
         monkeypatch.delenv("LLM_AUTH_KEY", raising=False)
         with pytest.raises(RuntimeError, match="Сервис временно недоступен"):
-            process_chat(1, "test")
-
-    def test_process_chat_country_not_found(self, monkeypatch):
-        """Unknown country ID raises ValueError."""
-        monkeypatch.setenv("LLM_AUTH_KEY", "dummy_key")
-        with pytest.raises(ValueError, match="Country 99 not found"):
-            process_chat(99, "test")
+            process_chat("test")
 
 
 class TestIsEmptyCriteria:
