@@ -31,9 +31,9 @@ class LLMTimeoutError(RuntimeError):
 
 
 def is_empty_criteria(analyst_data: AnalystResponse) -> bool:
-    """Check if region, category, preferences are all empty."""
+    """Check if locations, category, preferences are all empty."""
     return (
-        not analyst_data.region
+        not analyst_data.locations
         and not analyst_data.category
         and not analyst_data.preferences
     )
@@ -120,9 +120,18 @@ def process_chat(user_message: str) -> dict:
         country_name = analyst_parsed.country
         empty_criteria = is_empty_criteria(analyst_parsed)
 
+        # Если критерии пустые — сразу вернуть сообщение, не отправляя запрос к Expert
+        if empty_criteria:
+            return {
+                "message": (
+                    "Вы не задали ни одного критерия для подборки отелей. "
+                    "Добавьте в запрос критерии для подбора (страну или город, ваши предпочтения, количество звезд)."
+                )
+            }
+
         # ---- Step 2: Travel expert ----
         analyst_json = analyst_parsed.model_dump_json(indent=2, ensure_ascii=False)
-        system2 = build_travel_expert_prompt(country_name, analyst_json)
+        system2 = build_travel_expert_prompt(analyst_json)
         logger.info("step=expert system_prompt=%s", system2)
         expert_cache_key = (
             "expert",
@@ -138,13 +147,7 @@ def process_chat(user_message: str) -> dict:
             try:
                 json.loads(cached)
                 result = TravelExpertResponse.model_validate_json(cached)
-                result_dict = result.model_dump(mode="json", exclude_unset=True)
-                if empty_criteria:
-                    result_dict["message"] = (
-                        "Вы не задали ни одного критерия для подборки отелей. "
-                        "Вот на всякий случай несколько отелей по запрошенной вами стране."
-                    )
-                return result_dict
+                return result.model_dump(mode="json", exclude_unset=True)
             except ValidationError:
                 logger.warning("CACHE INVALID expert, deleting")
                 cache_delete(expert_cache_key)
@@ -189,13 +192,6 @@ def process_chat(user_message: str) -> dict:
                     )
 
         result_dict = expert_parsed.model_dump(mode="json", exclude_unset=True)
-
-        if empty_criteria:
-            result_dict["message"] = (
-                "Вы не задали ни одного критерия для подборки отелей. "
-                "Вот на всякий случай несколько отелей по запрошенной вами стране."
-            )
-
         return result_dict
 
     except (LLMValidationError, LLMTimeoutError, LLMUnavailableError):

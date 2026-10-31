@@ -41,7 +41,7 @@
         <div class="card">
             <form id="chatForm">
                 <label for="message">Запрос</label>
-                <textarea id="message" name="message" placeholder="Подскажи отели у моря в Турции..." required></textarea>
+                <textarea id="message" name="message" placeholder="Подскажи отели у моря в Турции..."></textarea>
 
                 <button type="submit" id="submitBtn">Отправить</button>
             </form>
@@ -89,16 +89,13 @@
                             html += `</div>`;
 
                             if (hotel.description) {
-                                html += `<div class="hotel-field"><div class="hotel-field-label">Описание</div><div class="hotel-field-value">${escapeHtml(hotel.description)}</div></div>`;
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Почему подходит</div><div class="hotel-field-value">${escapeHtml(hotel.description)}</div></div>`;
                             }
                             if (hotel.advantages) {
-                                html += `<div class="hotel-field"><div class="hotel-field-label">Преимущества</div><div class="hotel-field-value">${escapeHtml(hotel.advantages)}</div></div>`;
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Главные фишки</div><div class="hotel-field-value">${escapeHtml(hotel.advantages)}</div></div>`;
                             }
                             if (hotel.nuance) {
-                                html += `<div class="hotel-field"><div class="hotel-field-label">На что обратить внимание</div><div class="hotel-field-value">${escapeHtml(hotel.nuance)}</div></div>`;
-                            }
-                            if (hotel.kindOfLeisure) {
-                                html += `<div class="hotel-field"><div class="hotel-field-label">Для какого отдыха подойдет</div><div class="hotel-field-value">${escapeHtml(hotel.kindOfLeisure)}</div></div>`;
+                                html += `<div class="hotel-field"><div class="hotel-field-label">Нюансы</div><div class="hotel-field-value">${escapeHtml(hotel.nuance)}</div></div>`;
                             }
 
                             html += `</div>`;
@@ -154,11 +151,13 @@
                     const msg = json.message && json.message.error ? json.message.error : (json.error || 'Ошибка сервера');
                     responseDiv.textContent = msg;
                     responseDiv.style.whiteSpace = 'pre-wrap';
+                    responseDiv.style.display = 'block';
                 }
             } catch (err) {
                 loading.style.display = 'none';
                 responseDiv.className = 'error';
                 responseDiv.textContent = 'Не удалось connect к серверу';
+                responseDiv.style.display = 'block';
                 submitBtn.disabled = false;
             }
         });

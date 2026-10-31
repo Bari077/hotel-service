@@ -1,7 +1,5 @@
 """Prompt templates and builders."""
 
-import json
-
 
 def build_analyst_prompt(user_message: str) -> str:
     """Build system prompt for the analyst step.
@@ -9,88 +7,47 @@ def build_analyst_prompt(user_message: str) -> str:
     The model will return JSON matching AnalystResponse schema.
     """
     return (
-        f"Ты — аналитик туристической отрасли. "
-        f"Клиент прислал запрос: {user_message}\n\n"
-        f"Извлеки из запроса следующие параметры и верни в формате JSON:\n"
-        f"- country: название страны (обязательно)\n"
-        f"- region: список курортов/регионов (если есть в запросе, иначе пустой массив)\n"
-        f"- category: список звездности отелей (если есть в запросе, иначе пустой массив)\n"
-        f"- preferences: список предпочтений по отелю (если есть в запросе, иначе пустой массив)\n\n"
-        f"Верни ТОЛЬКО JSON-объект, без пояснений и комментариев."
+        "Вы — аналитик туристических запросов. Ваша задача — выделить из текста пользователя: "
+        "локацию (страну, город и курорт), звездность и ключевые требования "
+        "(первая береговая, бассейн, все включено, для семей с детьми и т.д.). "
+        "Городов и курортов может быть несколько в запросе.\n\n"
+        f"Запрос пользователя: {user_message}\n\n"
+        "Выведи результат в виде структурированного JSON:\n"
+        "- country: название страны (обязательно)\n"
+        "- locations: массив городов и курортов (если есть в запросе, иначе пустой массив)\n"
+        "- category: массив звездности (если есть в запросе, иначе пустой массив)\n"
+        "- preferences: массив ключевых требований (если есть в запросе, иначе пустой массив)\n\n"
+        "Верни ТОЛЬКО JSON-объект, без пояснений и комментариев."
     )
 
 
-def build_travel_expert_prompt(country_name: str, analyst_json: str) -> str:
+def build_travel_expert_prompt(analyst_json: str) -> str:
     """Build system prompt for the travel expert step.
 
     The model will return JSON matching TravelExpertResponse schema.
     """
-    user_prompt_text = build_travel_expert_user_prompt(analyst_json)
-
     return (
-        "Ты – тревел-эксперт.\n"
-        "Составь список из 5 отелей по запросу клиента:\n"
-        f"{user_prompt_text}\n"
-        "Для каждого отеля напиши:\n"
-        "1. Название отеля (hotel)\n"
-        "2. Описание (до 200 символов) (description)\n"
-        "3. Количество звезд (число) (category)\n"
-        "4. Преимущества, укажи, что соответствует preferences из user_prompt (до 300 символов) (advantages)\n"
-        "5. Нюансы, на что стоит обратить внимание (до 150 символов) (nuance)\n"
-        "6. Для какого отдыха подойдет (до 100 символов) (kindOfLeisure)\n"
-        "Отели строго в указанных, регионах\n"
-        "Если не указан регион предложи по 2-3 отеля в 3 разных регионах страны согласно критериям из запроса.\n"
-        "В travelRecommendation напиши рекомендации времени отдыха в выбранной стране, максимально 200 символов.\n"
+        "Вы — эксперт по бронированию отелей. На основе структурированных требований пользователя "
+        "сформируйте подборку из 4 подходящих отелей.\n\n"
+        "Данные запроса клиента:\n"
+        f"{analyst_json}\n\n"
+        "Для каждого отеля укажите:\n"
+        "1. Название отеля (hotel): строка\n"
+        "2. Звездность (category): число 1-5\n"
+        "3. Краткое описание-обоснование (description): строка, до 200 символов\n"
+        "4. Главные фишки (advantages): строка через запятую, до 300 символов\n"
+        "5. Нюансы (nuance): строка, до 150 символов\n\n"
+        "ВАЖНО: advantages — это строка, НЕ массив. Пример: \"Бассейн, пляж, SPA\"\n\n"
+        "Вы должны вернуть ответ строго в формате JSON по указанной схеме.\n\n"
+        "В travelRecommendation напиши рекомендации времени отдыха в выбранной локации, "
+        "максимально 200 символов.\n\n"
+        "КРИТИЧЕСКОЕ ТРЕБОВАНИЕ К ГЕОГРАФИИ:\n"
+        "Перед тем как добавить отель в финальный JSON, проверь его адрес по шагам (Chain of Thought):\n"
+        "1. В каком городе/курорте физически находится этот отель?\n"
+        "2. Соответствует ли этот город локации из запроса пользователя?\n"
+        "3. Если отель находится в другом месте (например, пользователь просил Красную Поляну, "
+        "а отель в Адлере или выдуман), ты ОБЯЗАН его отбросить и выбрать другой.\n"
+        "4. Пиши только реальные, широко известные отели, в существовании и адресе которых "
+        "ты уверен на 100%. Если сомневаешься — не включай его в подборку.\n\n"
         "Верни ТОЛЬКО JSON-объект без пояснений и комментариев."
     )
-
-
-def build_travel_expert_user_prompt(analyst_json: str) -> str:
-    """Build user prompt for the travel expert step from analyst JSON.
-
-    Parses the JSON and constructs a natural-language query about hotels.
-    """
-    country = ""
-    region = []
-    category = []
-    preferences = []
-
-    try:
-        data = json.loads(analyst_json)
-        country = data.get("country", "")
-        region = data.get("region") or []
-        category = data.get("category") or []
-        preferences = data.get("preferences") or []
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    region_phrase = ""
-    if isinstance(region, list) and region:
-        if len(region) == 1:
-            region_phrase = f"в регионе {region[0]}"
-        else:
-            region_str = ", ".join(region)
-            region_phrase = f"в регионах {region_str}"
-    elif isinstance(region, str) and region:
-        region_phrase = f"в регионе {region}"
-
-    category_str = ""
-    if isinstance(category, list):
-        category_str = ", ".join(str(c) for c in category)
-    else:
-        category_str = str(category) if category else ""
-    category_phrase = f"{category_str} звезд " if category_str else ""
-
-    preferences_str = ""
-    if isinstance(preferences, list):
-        preferences_str = ", ".join(preferences)
-    else:
-        preferences_str = str(preferences) if preferences else ""
-
-    user_prompt = (
-        f"Какие отели {category_phrase}рекомендуешь для отдыха "
-        f"в стране {country} {region_phrase}. "
-        f"Мои предпочтения: {preferences_str}"
-    )
-
-    return " ".join(user_prompt.split())

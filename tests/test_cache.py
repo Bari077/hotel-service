@@ -1,8 +1,6 @@
 """Unit tests for cache module."""
 
 import json
-import os
-import time
 
 import pytest
 

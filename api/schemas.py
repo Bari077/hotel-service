@@ -7,10 +7,15 @@ class ChatRequest(BaseModel):
     """User chat request."""
 
     message: str = Field(
-        min_length=1,
-        max_length=500,
         description="Текст запроса пользователя",
     )
+
+    @field_validator("message")
+    @classmethod
+    def message_not_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Сообщение не может быть пустым")
+        return v
 
     @field_validator("message")
     @classmethod
@@ -19,9 +24,9 @@ class ChatRequest(BaseModel):
             raise ValueError("Сообщение не может состоять только из пробелов")
         return v
 
-
-class ChatResponse(BaseModel):
-    """API response."""
-
-    message: dict
-    status: str = "ok"
+    @field_validator("message")
+    @classmethod
+    def message_not_too_long(cls, v: str) -> str:
+        if len(v) > 500:
+            raise ValueError("Сообщение слишком длинное (максимум 500 символов)")
+        return v

@@ -1,6 +1,6 @@
 """Pydantic models for LLM structured output."""
 
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 
 
@@ -8,9 +8,9 @@ class AnalystResponse(BaseModel):
     """Response from the Analyst step — parses user request into structured criteria."""
 
     country: str = Field(description="Название страны из запроса пользователя")
-    region: List[str] = Field(
+    locations: List[str] = Field(
         default_factory=list,
-        description="Список курортов/регионов из запроса пользователя. Если нет — пустой массив",
+        description="Города и курорты из запроса пользователя. Если нет — пустой массив",
     )
     category: List[int] = Field(
         default_factory=list,
@@ -18,7 +18,7 @@ class AnalystResponse(BaseModel):
     )
     preferences: List[str] = Field(
         default_factory=list,
-        description="Предпочтения по отелю из запроса пользователя. Если нет — пустой массив",
+        description="Ключевые требования к отелю из запроса. Если нет — пустой массив",
     )
 
 
@@ -27,10 +27,9 @@ class HotelCard(BaseModel):
 
     hotel: str = Field(description="Название отеля")
     category: int = Field(description="Количество звёзд (1-5)")
-    description: str = Field(description="Описание отеля, до 200 символов")
-    advantages: str = Field(description="Преимущества отеля, до 300 символов")
-    nuance: str = Field(description="Нюансы, на что стоит обратить внимание, до 150 символов")
-    kindOfLeisure: str = Field(description="Для какого отдыха подойдёт, до 100 символов")
+    description: str = Field(description="Краткое описание-обоснование, почему отель подходит")
+    advantages: str = Field(description="Главные фишки отеля")
+    nuance: str = Field(description="Нюансы, на что стоит обратить внимание")
 
 
 class RegionHotels(BaseModel):

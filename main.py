@@ -4,7 +4,7 @@ import os
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-from utils.logging import setup_logger, log_timing
+from utils.logging import setup_logger
 
 load_dotenv()
 logger = setup_logger()

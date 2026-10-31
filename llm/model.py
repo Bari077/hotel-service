@@ -1,6 +1,5 @@
 """LLM model client and inference logic."""
 
-import json
 import os
 import time
 import uuid
@@ -9,8 +8,6 @@ import logging
 import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel
-
-from llm.prompts import build_travel_expert_prompt
 
 logger = logging.getLogger("hotel-service")
 

@@ -19,6 +19,11 @@ class TestChatEndpoint:
         with pytest.raises(Exception):
             ChatRequest.model_validate({"message": ""})
 
+    def test_message_empty_string(self):
+        """Empty string message is rejected."""
+        with pytest.raises(Exception):
+            ChatRequest.model_validate({"message": ""})
+
     def test_message_too_long(self):
         """Overly long message is rejected."""
         with pytest.raises(Exception):

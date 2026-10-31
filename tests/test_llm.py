@@ -7,7 +7,6 @@ from llm.prompts import (
     build_travel_expert_prompt,
 )
 from llm.model import chat_completion
-from llm.schemas import AnalystResponse
 
 
 class TestBuildAnalystPrompt:
@@ -39,37 +38,32 @@ class TestBuildTravelExpertPrompt:
 
     def test_returns_string(self):
         """Returns a string (system prompt only)."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция", "region": ["Анталья"]}')
+        result = build_travel_expert_prompt('{"country": "Турция", "locations": ["Анталья"]}')
         assert isinstance(result, str)
 
     def test_system_prompt_instructs_json(self):
         """System prompt instructs to return JSON."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция"}')
+        result = build_travel_expert_prompt('{"country": "Турция"}')
         assert "JSON" in result
-
-    def test_includes_country_name(self):
-        """System prompt includes the country name."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция"}')
-        assert "Турция" in result
 
     def test_includes_json_data(self):
         """System prompt includes the json_data."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция", "region": ["Анталья"]}')
+        result = build_travel_expert_prompt('{"country": "Турция", "locations": ["Анталья"]}')
         assert "Анталья" in result
 
     def test_includes_hotel_fields(self):
         """System prompt includes all hotel fields."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция"}')
+        result = build_travel_expert_prompt('{"country": "Турция"}')
         assert "hotel" in result
-        assert "Описание" in result or "description" in result
-        assert "звёзд" in result or "category" in result
-        assert "Преимущества" in result or "advantages" in result
-        assert "Нюансы" in result or "nuance" in result
-        assert "kindOfLeisure" in result
+        assert "description" in result
+        assert "category" in result
+        assert "advantages" in result
+        assert "nuance" in result
+        assert "kindOfLeisure" not in result
 
     def test_includes_travel_recommendation(self):
         """System prompt includes travelRecommendation."""
-        result = build_travel_expert_prompt("Турция", '{"country": "Турция"}')
+        result = build_travel_expert_prompt('{"country": "Турция"}')
         assert "travelRecommendation" in result
 
 

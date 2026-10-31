@@ -23,17 +23,17 @@ class TestIsEmptyCriteria:
         """All criteria empty → True."""
         analyst = AnalystResponse(
             country="Тайланд",
-            region=[],
+            locations=[],
             category=[],
             preferences=[],
         )
         assert is_empty_criteria(analyst) is True
 
-    def test_region_present(self):
-        """Region specified → False."""
+    def test_locations_present(self):
+        """Locations specified → False."""
         analyst = AnalystResponse(
             country="Тайланд",
-            region=["Пхукет"],
+            locations=["Пхукет"],
             category=[],
             preferences=[],
         )
@@ -43,7 +43,7 @@ class TestIsEmptyCriteria:
         """Category specified → False."""
         analyst = AnalystResponse(
             country="Тайланд",
-            region=[],
+            locations=[],
             category=[5],
             preferences=[],
         )
@@ -53,7 +53,7 @@ class TestIsEmptyCriteria:
         """Preferences specified → False."""
         analyst = AnalystResponse(
             country="Тайланд",
-            region=[],
+            locations=[],
             category=[],
             preferences=["у моря"],
         )
@@ -63,50 +63,8 @@ class TestIsEmptyCriteria:
         """All criteria specified → False."""
         analyst = AnalystResponse(
             country="Тайланд",
-            region=["Пхукет"],
+            locations=["Пхукет"],
             category=[5],
             preferences=["все включено"],
         )
         assert is_empty_criteria(analyst) is False
-
-
-class TestProcessChatMessage:
-    """Tests for message field when criteria are empty."""
-
-    def test_empty_criteria_adds_message(self):
-        """Empty criteria → message field added."""
-        result = {
-            "hotelList": [{"region": "Пхукет", "hotels": []}],
-            "travelRecommendation": "test",
-        }
-        analyst = AnalystResponse(
-            country="Тайланд",
-            region=[],
-            category=[],
-            preferences=[],
-        )
-        if is_empty_criteria(analyst):
-            result["message"] = (
-                "Вы не задали ни одного критерия для подборки отелей. "
-                "Вот на всякий случай несколько отелей по запрошенной вами стране."
-            )
-
-        assert "message" in result
-        assert "ни одного критерия" in result["message"]
-
-    def test_non_empty_criteria_no_message(self):
-        """Non-empty criteria → no message field."""
-        result = {
-            "hotelList": [{"region": "Пхукет", "hotels": []}],
-            "travelRecommendation": "test",
-        }
-        analyst = AnalystResponse(
-            country="Тайланд",
-            region=["Пхукет"],
-            category=[],
-            preferences=[],
-        )
-        if is_empty_criteria(analyst):
-            result["message"] = "test"
-
-        assert "message" not in result
