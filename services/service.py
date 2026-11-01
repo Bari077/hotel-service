@@ -54,12 +54,11 @@ def process_chat(user_message: str) -> dict:
     try:
         # ---- Step 1: Analyst ----
         system1 = build_analyst_prompt(user_message)
-        logger.info("step=analyst system_prompt=%s", system1)
+        logger.info("step=analyst system_prompt=%s", system1[:200])
         analyst_cache_key = (
             "analyst",
             user_message,
             system1,
-            os.getenv("LLM_MODEL", "GigaChat-2-Pro"),
             str(os.getenv("LLM_TEMPERATURE", 0.7)),
         )
 
@@ -132,12 +131,11 @@ def process_chat(user_message: str) -> dict:
         # ---- Step 2: Travel expert ----
         analyst_json = analyst_parsed.model_dump_json(indent=2, ensure_ascii=False)
         system2 = build_travel_expert_prompt(analyst_json)
-        logger.info("step=expert system_prompt=%s", system2)
+        logger.info("step=expert system_prompt=%s", system2[:200])
         expert_cache_key = (
             "expert",
             analyst_json,
             system2,
-            os.getenv("LLM_MODEL", "GigaChat-2-Pro"),
             str(os.getenv("LLM_TEMPERATURE", 0.7)),
         )
 

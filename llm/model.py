@@ -172,8 +172,8 @@ def chat_completion(
 
     logger.info(
         "llm_prompt system=%s user=%s model=%s",
-        system_prompt,
-        user_prompt,
+        system_prompt[:200],
+        user_prompt[:200],
         response_model.__name__ if response_model else "text",
     )
 
